@@ -1,28 +1,19 @@
 # EthioHub Remote Videos (GitHub-Only Media Hosting)
 
-Upload `.mp4` or `.webm` video files into `public/remote-videos/` and register them in `public/manifest.json` under the `"videos"` array.
+Upload `.mp4`, `.webm`, or `.mov` videos directly into **`public/remote-videos/`** inside GitHub!
 
-Example entry in `public/manifest.json`:
+## Recommended Video Naming
+Name your videos sequentially using natural names:
+- `full video one.mp4`
+- `full video two.mp4`
+- `full video three.mp4`
+- `full video four.mp4`
 
-```json
-{
-  "id": "vid-midnight-tizita",
-  "name": "midnight_tizita.mp4",
-  "path": "public/remote-videos/midnight_tizita.mp4",
-  "version": "1.0.0",
-  "updatedAt": "2026-11-26T01:00:00Z",
-  "mimeType": "video/mp4",
-  "thumbnailId": "hero_ethiojazz_addis",
-  "title": "Midnight Tizita: Live in Kazanchis",
-  "description": "Recorded live in Addis Ababa.",
-  "creatorId": "creator-selam",
-  "category": "Music",
-  "region": "Addis Ababa",
-  "language": "Amharic · English CC",
-  "durationSec": 320
-}
-```
+## Optional Matching Cover Images
+To give a video its own custom thumbnail, upload an image with the **same base name** into **`public/remote-images/`**:
+- `public/remote-images/full video one.jpg` (or `.png` / `.webp`) -> automatically pairs with `full video one.mp4`
+- `public/remote-images/full video two.jpg` -> automatically pairs with `full video two.mp4`
 
-- Using an existing catalog `id` (like `"vid-midnight-tizita"`) attaches the GitHub-hosted video stream directly to that catalog film.
-- Using a new `id` automatically adds the video to the EthioHub catalog with zero app reinstallation.
-- Bump `"version"` or `"updatedAt"` whenever you replace a video or image file so connected devices refresh only the changed asset.
+## Automatic Sync (No APK Reinstall Needed)
+1. Upload your video or image inside GitHub.
+2. EthioHub automatically detects new and replaced files in `public/remote-videos/` and `public/remote-images/`, keeps them in numeric order (`Full Video One`, `Full Video Two`, ...), caches them locally on the device for offline playback, and updates `public/manifest.json` via GitHub Actions without rebuilding or reinstalling the APK.

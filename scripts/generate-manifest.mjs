@@ -25,6 +25,49 @@ const VIDEO_MIME_BY_EXT = {
   '.m4v': 'video/mp4',
 };
 
+const WORD_NUMBERS = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+};
+
+function extractSequenceNumber(name) {
+  const clean = name.replace(/\.[^.]+$/, '').toLowerCase();
+  const digitMatch = clean.match(/(?:^|[\s_-])(\d+)(?:$|[\s_-])/);
+  if (digitMatch) return Number(digitMatch[1]);
+  const tokens = clean.split(/[\s_-]+/);
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    if (WORD_NUMBERS[tokens[i]] !== undefined) {
+      return WORD_NUMBERS[tokens[i]];
+    }
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function compareMediaNames(a, b) {
+  const numA = extractSequenceNumber(a);
+  const numB = extractSequenceNumber(b);
+  if (numA !== numB) return numA - numB;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 function fileShortHash(filePath) {
   const buf = fs.readFileSync(filePath);
   return crypto.createHash('sha256').update(buf).digest('hex').slice(0, 12);
@@ -44,6 +87,8 @@ function toReadableLabel(filename) {
     .replace(/\.[^.]+$/, '')
     .replace(/_\d{10,}$/, '')
     .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
@@ -51,7 +96,7 @@ function loadExistingManifest() {
   if (!fs.existsSync(MANIFEST_PATH)) {
     return {
       schemaVersion: 1,
-      repository: { owner: '', repo: '', branch: 'main' },
+      repository: { owner: 'medrockonlineworks-cyber', repo: 'Hub', branch: 'main' },
       updatedAt: new Date().toISOString(),
       images: [],
       videos: [],
@@ -62,7 +107,7 @@ function loadExistingManifest() {
   } catch {
     return {
       schemaVersion: 1,
-      repository: { owner: '', repo: '', branch: 'main' },
+      repository: { owner: 'medrockonlineworks-cyber', repo: 'Hub', branch: 'main' },
       updatedAt: new Date().toISOString(),
       images: [],
       videos: [],
@@ -78,7 +123,7 @@ function bumpPatchVersion(version) {
   return '1.0.1';
 }
 
-function scanDirectory(dirPath, mimeMap, repoPrefix, existingList, nowIso) {
+function scanDirectory(dirPath, mimeMap, repoPrefix, existingList, nowIso, isVideo = false, imageList = []) {
   if (!fs.existsSync(dirPath)) return { list: existingList || [], changed: false };
 
   const existingByName = new Map();
@@ -88,13 +133,18 @@ function scanDirectory(dirPath, mimeMap, repoPrefix, existingList, nowIso) {
     if (item.path) existingByPath.set(item.path, item);
   }
 
+  const imageById = new Map();
+  for (const img of imageList) {
+    imageById.set(img.id, img);
+  }
+
   const files = fs
     .readdirSync(dirPath)
     .filter((f) => {
       const ext = path.extname(f).toLowerCase();
       return Boolean(mimeMap[ext]);
     })
-    .sort();
+    .sort(compareMediaNames);
 
   let changed = false;
   const result = [];
@@ -104,51 +154,64 @@ function scanDirectory(dirPath, mimeMap, repoPrefix, existingList, nowIso) {
     const relPath = `${repoPrefix}/${filename}`;
     const ext = path.extname(filename).toLowerCase();
     const hash = fileShortHash(absPath);
+    const id = toAssetId(filename);
+    const readableTitle = toReadableLabel(filename);
+    const matchedThumb = isVideo ? imageById.get(id) : null;
     const prev = existingByPath.get(relPath) || existingByName.get(filename);
 
     if (prev) {
-      // Preserve unchanged entries verbatim so devices skip re-downloading unchanged files
-      if (prev.sha256 === hash) {
+      const nextThumbId = prev.thumbnailId || matchedThumb?.id;
+      const thumbChanged = isVideo && nextThumbId !== prev.thumbnailId;
+
+      if (prev.sha256 === hash && !thumbChanged) {
         result.push(prev);
         continue;
       }
 
-      // First hash backfill without forcing unnecessary version bump if already synced
       if (!prev.sha256) {
         changed = true;
         result.push({
           ...prev,
           path: relPath,
           mimeType: prev.mimeType || mimeMap[ext],
+          ...(isVideo ? { title: prev.title || readableTitle } : {}),
+          ...(nextThumbId ? { thumbnailId: nextThumbId } : {}),
           sha256: hash,
         });
         continue;
       }
 
-      // Content changed -> bump version & updatedAt automatically so devices refresh only this file
       changed = true;
       result.push({
         ...prev,
         name: filename,
         path: relPath,
-        version: bumpPatchVersion(prev.version),
+        version: prev.sha256 !== hash ? bumpPatchVersion(prev.version) : prev.version,
         updatedAt: nowIso,
         mimeType: mimeMap[ext],
+        ...(isVideo ? { title: prev.title || readableTitle } : {}),
+        ...(nextThumbId ? { thumbnailId: nextThumbId } : {}),
         sha256: hash,
       });
     } else {
-      // Newly uploaded image or video detected
       changed = true;
-      result.push({
-        id: toAssetId(filename),
+      const entry = {
+        id,
         name: filename,
         path: relPath,
         version: '1.0.0',
         updatedAt: nowIso,
         mimeType: mimeMap[ext],
-        label: toReadableLabel(filename),
+        label: readableTitle,
         sha256: hash,
-      });
+      };
+      if (isVideo) {
+        entry.title = readableTitle;
+        if (matchedThumb) {
+          entry.thumbnailId = matchedThumb.id;
+        }
+      }
+      result.push(entry);
     }
   }
 
@@ -174,14 +237,17 @@ const imageScan = scanDirectory(
   IMAGE_MIME_BY_EXT,
   'public/remote-images',
   current.images,
-  nowIso
+  nowIso,
+  false
 );
 const videoScan = scanDirectory(
   REMOTE_VIDEOS_DIR,
   VIDEO_MIME_BY_EXT,
   'public/remote-videos',
   current.videos,
-  nowIso
+  nowIso,
+  true,
+  imageScan.list
 );
 
 const repoChanged =

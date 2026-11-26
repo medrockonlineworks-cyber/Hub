@@ -1,8 +1,12 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Check, Copy, ExternalLink, Image as ImageIcon, RefreshCw, Upload, X } from 'lucide-react';
 import { THUMBNAIL_PRESETS } from '../data/catalog';
 import { useGitHubMedia } from '../hooks/useGitHubMedia';
-import { buildLocalPublicUrl } from '../services/githubMediaManager';
+import {
+  buildLocalPublicUrl,
+  formatNumberWord,
+  githubMediaManager,
+} from '../services/githubMediaManager';
 import { EthioRegion, QenetMode, Video, VideoCategory } from '../types/ethiohub';
 import { MediaImage } from './MediaImage';
 
@@ -60,6 +64,10 @@ export function PublishModal({
     return [...THUMBNAIL_PRESETS, ...extras];
   }, [mediaSnapshot.remoteImages]);
 
+  const nextVideoNumber = mediaSnapshot.remoteVideos.length + 1;
+  const suggestedBaseName = `full video ${formatNumberWord(nextVideoNumber)}`;
+  const uploadUrls = githubMediaManager.getUploadUrls();
+
   const [title, setTitle] = useState('');
   const [creatorName, setCreatorName] = useState(defaultCreatorName || 'Amanuel Tesfaye');
   const [category, setCategory] = useState<VideoCategory>('Music');
@@ -68,9 +76,11 @@ export function PublishModal({
   const [qenetMode, setQenetMode] = useState<QenetMode>('tizita');
   const [description, setDescription] = useState('');
   const [selectedThumb, setSelectedThumb] = useState<string>(THUMBNAIL_PRESETS[0].url);
+  const [customThumbName, setCustomThumbName] = useState<string>('');
   const [localVideoUrl, setLocalVideoUrl] = useState<string | undefined>(undefined);
   const [localVideoName, setLocalVideoName] = useState<string>('');
   const [detectedDuration, setDetectedDuration] = useState<number>(360);
+  const [copiedName, setCopiedName] = useState(false);
   const [error, setError] = useState<string>('');
 
   if (!isOpen) return null;
@@ -87,7 +97,14 @@ export function PublishModal({
     setLocalVideoUrl(objectUrl);
     setLocalVideoName(file.name);
 
-    // Probe actual video duration cleanly
+    if (!title.trim()) {
+      const cleanName = file.name
+        .replace(/\.[^.]+$/, '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (ch) => ch.toUpperCase());
+      setTitle(cleanName);
+    }
+
     const probe = document.createElement('video');
     probe.preload = 'metadata';
     probe.onloadedmetadata = () => {
@@ -96,6 +113,36 @@ export function PublishModal({
       }
     };
     probe.src = objectUrl;
+  };
+
+  const handleImageFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file (JPG, PNG, or WebP).');
+      return;
+    }
+    setError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setSelectedThumb(reader.result);
+        setCustomThumbName(file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCopySuggestedName = () => {
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(`${suggestedBaseName}.mp4`).catch(() => {});
+    }
+    setCopiedName(true);
+    window.setTimeout(() => setCopiedName(false), 1800);
+  };
+
+  const handleSyncFromGitHub = () => {
+    void githubMediaManager.syncManifest(true);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -149,6 +196,7 @@ export function PublishModal({
     setDescription('');
     setLocalVideoUrl(undefined);
     setLocalVideoName('');
+    setCustomThumbName('');
     setError('');
     onClose();
   };
@@ -174,7 +222,7 @@ export function PublishModal({
               Publish to EthioHub
             </h2>
             <p className="text-sm text-zinc-400 mt-1">
-              Share your Ethiopian music session, cultural film, or local story.
+              Upload directly into your GitHub repository for all devices, or preview locally.
             </p>
           </div>
           <button
@@ -187,6 +235,67 @@ export function PublishModal({
           </button>
         </div>
 
+        {/* Direct GitHub Upload Workflow (Images & Videos for All Installed APKs) */}
+        <div className="mt-5 p-4 rounded-xl bg-[#09090B] border border-white/[0.08]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-100">
+                Upload Images & Videos Inside GitHub
+              </h3>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Name videos sequentially (e.g.{' '}
+                <span className="font-mono text-zinc-200">{suggestedBaseName}.mp4</span>) and pair
+                an optional cover image (<span className="font-mono text-zinc-200">{suggestedBaseName}.jpg</span>).
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCopySuggestedName}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#18181E] text-zinc-200 hover:bg-[#22222B] transition-colors whitespace-nowrap shrink-0"
+            >
+              {copiedName ? <Check className="w-3.5 h-3.5 text-[#1F8A5B]" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedName ? 'Copied' : `Copy "${suggestedBaseName}.mp4"`}</span>
+            </button>
+          </div>
+
+          <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+            {uploadUrls.videosUrl && (
+              <a
+                href={uploadUrls.videosUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold bg-[#E5A91A] text-zinc-950 hover:bg-[#F2B705] transition-colors whitespace-nowrap"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Video to GitHub</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+            {uploadUrls.imagesUrl && (
+              <a
+                href={uploadUrls.imagesUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium bg-[#18181E] border border-white/10 text-zinc-100 hover:bg-[#23232D] transition-colors whitespace-nowrap"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Upload Image to GitHub</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={handleSyncFromGitHub}
+              disabled={mediaSnapshot.isSyncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium text-zinc-300 hover:text-white border border-white/[0.08] hover:bg-white/[0.04] transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${mediaSnapshot.isSyncing ? 'animate-spin' : ''}`} />
+              <span>{mediaSnapshot.isSyncing ? 'Syncing GitHub...' : 'Sync GitHub Now'}</span>
+            </button>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="mt-5 space-y-5">
           {error && (
             <div className="px-4 py-3 rounded-lg bg-[#C93B2B]/15 border border-[#C93B2B]/40 text-sm text-red-200">
@@ -194,28 +303,53 @@ export function PublishModal({
             </div>
           )}
 
-          {/* Optional Local Video File Upload */}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-2">
-              Video File (Optional — MP4 / WebM plays directly in Cinema Player)
-            </label>
-            <label className="flex items-center justify-between gap-4 px-4 py-3.5 rounded-xl border border-dashed border-white/15 bg-[#09090B] hover:border-[#E5A91A]/60 cursor-pointer transition-colors">
-              <div className="flex items-center gap-3 min-w-0">
-                <Upload className="w-4 h-4 text-[#E5A91A] shrink-0" />
-                <span className="text-sm text-zinc-300 truncate">
-                  {localVideoName || 'Select a local MP4 or WebM video, or stream with studio visuals'}
+          {/* Local Video & Cover Image Pickers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                Local Video File (MP4 / WebM)
+              </label>
+              <label className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl border border-dashed border-white/15 bg-[#09090B] hover:border-[#E5A91A]/60 cursor-pointer transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Upload className="w-4 h-4 text-[#E5A91A] shrink-0" />
+                  <span className="text-xs text-zinc-300 truncate">
+                    {localVideoName || 'Select video file'}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-[#E5A91A] whitespace-nowrap shrink-0">
+                  Browse
                 </span>
-              </div>
-              <span className="text-xs font-medium text-[#E5A91A] whitespace-nowrap shrink-0">
-                Choose File
-              </span>
-              <input
-                type="file"
-                accept="video/mp4,video/webm,video/quicktime"
-                onChange={handleVideoFileChange}
-                className="sr-only"
-              />
-            </label>
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime"
+                  onChange={handleVideoFileChange}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                Custom Cover Image (JPG / PNG / WebP)
+              </label>
+              <label className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl border border-dashed border-white/15 bg-[#09090B] hover:border-[#E5A91A]/60 cursor-pointer transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <ImageIcon className="w-4 h-4 text-[#E5A91A] shrink-0" />
+                  <span className="text-xs text-zinc-300 truncate">
+                    {customThumbName || 'Select image file'}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-[#E5A91A] whitespace-nowrap shrink-0">
+                  Browse
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  onChange={handleImageFileChange}
+                  className="sr-only"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -228,7 +362,7 @@ export function PublishModal({
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Evening Krar Improvisation in Piazza"
+                placeholder={`e.g. Full Video ${formatNumberWord(nextVideoNumber).replace(/^\w/, (c) => c.toUpperCase())}`}
                 maxLength={120}
                 className="w-full px-3.5 py-2.5 text-sm bg-[#09090B] border border-white/[0.1] rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-[#E5A91A]"
               />
@@ -327,7 +461,7 @@ export function PublishModal({
           {/* Cover Thumbnail Selection */}
           <div>
             <span className="block text-xs font-semibold text-zinc-300 mb-2">
-              Cover Frame
+              Or Choose Cover Frame from GitHub
             </span>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {coverPresets.map((preset) => {
@@ -336,7 +470,10 @@ export function PublishModal({
                   <button
                     key={preset.label}
                     type="button"
-                    onClick={() => setSelectedThumb(preset.url)}
+                    onClick={() => {
+                      setSelectedThumb(preset.url);
+                      setCustomThumbName('');
+                    }}
                     title={preset.label}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
                       active
@@ -382,7 +519,7 @@ export function PublishModal({
               type="submit"
               className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-[#E5A91A] text-zinc-950 hover:bg-[#F2B705] transition-colors"
             >
-              Publish Video
+              Publish Locally
             </button>
           </div>
         </form>

@@ -89,21 +89,43 @@ export function useEthioHubStore() {
 
     const newlyUploadedRemoteVideos: Video[] = mediaSnapshot.remoteVideos
       .filter((rv) => !existingIds.has(rv.id))
-      .map((rv) => {
+      .map((rv, index) => {
+        // Match thumbnail by explicit thumbnailPath/thumbnailId, matching image id (e.g. "full video one.jpg"), or clean fallback
+        const matchedImageById = mediaSnapshot.remoteImages.find((img) => img.id === rv.id);
+        const fallbackCovers = [
+          ASSETS.ethioJazz,
+          ASSETS.coffeeCeremony,
+          ASSETS.lalibelaDawn,
+          ASSETS.eskistaDance,
+          ASSETS.addisCulinary,
+          ASSETS.hararJugol,
+        ];
+        const fallbackThumb = fallbackCovers[index % fallbackCovers.length];
         const thumbSource = rv.thumbnailPath
           ? rv.thumbnailPath
           : rv.thumbnailId
             ? rv.thumbnailId
-            : ASSETS.ethioJazz;
-        const resolvedThumb = githubMediaManager.resolveImageSrc(thumbSource) || ASSETS.ethioJazz;
+            : matchedImageById
+              ? matchedImageById.id
+              : fallbackThumb;
+        const resolvedThumb = githubMediaManager.resolveImageSrc(thumbSource) || fallbackThumb;
         const resolvedVideoUrl = githubMediaManager.resolveVideoSrc(rv.id);
+        const cleanTitle =
+          rv.title ||
+          rv.name
+            .replace(/\.[^.]+$/, '')
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (ch) => ch.toUpperCase());
+
         return {
           id: rv.id,
-          title: rv.title || rv.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '),
-          subtitle: rv.subtitle || 'Remote GitHub Stream',
+          title: cleanTitle,
+          subtitle: rv.subtitle || 'EthioHub Full Video',
           description:
             rv.description ||
-            'Streamed directly from the EthioHub GitHub repository and cached locally for offline playback.',
+            `${cleanTitle} — streamed directly from the EthioHub GitHub repository and cached locally on your device for offline playback.`,
           creatorId: rv.creatorId || 'creator-selam',
           category: rv.category || 'Culture',
           subgenre: rv.subgenre || rv.category || 'Culture',
@@ -117,7 +139,7 @@ export function useEthioHubStore() {
           thumbnailUrl: resolvedThumb,
           sceneImages: [resolvedThumb],
           qenetMode: 'tizita',
-          chapters: [{ time: 0, title: 'Start' }],
+          chapters: [{ time: 0, title: cleanTitle }],
           subtitles: [],
           videoUrl: resolvedVideoUrl,
         };
