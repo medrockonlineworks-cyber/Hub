@@ -10,8 +10,6 @@ on:
       - 'public/remote-videos/**'
       - 'public/manifest.json'
       - '**.md'
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -39,8 +37,6 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
             TAG="${{ github.event.inputs.version }}"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
           else
             TAG="v1.0.${{ github.run_number }}"
           fi
@@ -52,11 +48,10 @@ jobs:
           echo "clean=${CLEAN_VER}" >> "$GITHUB_OUTPUT"
           echo "code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -67,8 +62,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
       - name: Install web dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps --no-audit --no-fund
 
       - name: Sync remote media manifest with repository coordinates
         env:
@@ -85,8 +85,8 @@ jobs:
           VITE_GITHUB_MANIFEST_PATH: public/manifest.json
         run: npm run build
 
-      - name: Install Capacitor Android tooling
-        run: npm install --no-save @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+      - name: Install Capacitor 7 Android tooling
+        run: npm install --no-save --legacy-peer-deps --no-audit --no-fund @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
 
       - name: Initialize & sync Android native project
         run: |
@@ -125,15 +125,15 @@ jobs:
 
           if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/release.keystore
-            ./gradlew assembleRelease \
+            ./gradlew assembleRelease --no-daemon \
               -Pandroid.injected.signing.store.file="$(pwd)/app/release.keystore" \
               -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
               -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
             cp app/build/outputs/apk/release/app-release.apk "../$OUT_APK"
           else
-            # Signed debug APK installs directly on Android devices with zero extra secrets required
-            ./gradlew assembleDebug
+            # Signed debug APK installs directly on Android devices without requiring extra keystore secrets
+            ./gradlew assembleDebug --no-daemon
             cp app/build/outputs/apk/debug/app-debug.apk "../$OUT_APK"
           fi
 
@@ -141,8 +141,16 @@ jobs:
           ls -lh "$OUT_APK"
           echo "apk_path=${OUT_APK}" >> "$GITHUB_OUTPUT"
 
+      - name: Upload APK workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EthioHub-${{ steps.version.outputs.tag }}-apk
+          path: ${{ steps.apk.outputs.apk_path }}
+
       - name: Publish GitHub Release with APK attached
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: EthioHub ${{ steps.version.outputs.tag }}
@@ -155,5 +163,5 @@ jobs:
 
             Tap **EthioHub-${{ steps.version.outputs.tag }}.apk** under **Assets** below to download and install on Android.
 
-            - **GitHub-Only Media Sync**: Automatically loads images from `public/remote-images/` and videos from `public/remote-videos/` via `public/manifest.json`.
+            - **GitHub-Only Media Sync**: Loads images from `public/remote-images/` and videos from `public/remote-videos/` via `public/manifest.json`.
             - **No Reinstall Needed for Media Updates**: Upload or replace images/videos on GitHub and the installed app automatically caches and refreshes updates offline.
