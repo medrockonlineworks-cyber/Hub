@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "repository": {
+    "owner": "",
+    "repo": "",
+    "branch": "main"
+  },
+  "updatedAt": "2026-11-26T09:11:31.338Z",
+  "images": [
+    {
+      "id": "creator_dawit_portrait",
+      "name": "creator_dawit_portrait_1795680880310.jpg",
+      "path": "public/remote-images/creator_dawit_portrait_1795680880310.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Dawit Tadesse Portrait",
+      "sha256": "43aef7e55a0c"
+    },
+    {
+      "id": "creator_selam_portrait",
+      "name": "creator_selam_portrait_1795680881100.jpg",
+      "path": "public/remote-images/creator_selam_portrait_1795680881100.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Selamawit Bekele Portrait",
+      "sha256": "c67a6714664d"
+    },
+    {
+      "id": "hero_ethiojazz_addis",
+      "name": "hero_ethiojazz_addis_1795680874509.jpg",
+      "path": "public/remote-images/hero_ethiojazz_addis_1795680874509.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Addis Ethio-Jazz Stage",
+      "sha256": "d0a353bc8d10"
+    },
+    {
+      "id": "thumb_addis_culinary",
+      "name": "thumb_addis_culinary_1795680878966.jpg",
+      "path": "public/remote-images/thumb_addis_culinary_1795680878966.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Addis Kitchen & Mesob",
+      "sha256": "594aed711c26"
+    },
+    {
+      "id": "thumb_coffee_ceremony",
+      "name": "thumb_coffee_ceremony_1795680875386.jpg",
+      "path": "public/remote-images/thumb_coffee_ceremony_1795680875386.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Buna Coffee Ceremony",
+      "sha256": "972c92a92400"
+    },
+    {
+      "id": "thumb_eskista_dance",
+      "name": "thumb_eskista_dance_1795680876884.jpg",
+      "path": "public/remote-images/thumb_eskista_dance_1795680876884.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Eskista Cultural Stage",
+      "sha256": "8a2ebe9f9126"
+    },
+    {
+      "id": "thumb_harar_jugol",
+      "name": "thumb_harar_jugol_1795680880194.jpg",
+      "path": "public/remote-images/thumb_harar_jugol_1795680880194.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Harar Jugol Alleys",
+      "sha256": "07232937f1c2"
+    },
+    {
+      "id": "thumb_lalibela_dawn",
+      "name": "thumb_lalibela_dawn_1795680875557.jpg",
+      "path": "public/remote-images/thumb_lalibela_dawn_1795680875557.jpg",
+      "version": "1.0.0",
+      "updatedAt": "2026-11-26T00:50:00Z",
+      "mimeType": "image/jpeg",
+      "label": "Lalibela Highland Dawn",
+      "sha256": "d5ce0de1f10e"
+    }
+  ],
+  "videos": []
+}

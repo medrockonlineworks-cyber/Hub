@@ -1,0 +1,47 @@
+name: Sync Remote Media Manifest
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'public/remote-images/**'
+      - 'public/remote-videos/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-manifest:
+    name: Auto-Update public/manifest.json (No APK Reinstall Required)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Scan remote images & videos and update manifest.json
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: node scripts/generate-manifest.mjs
+
+      - name: Commit updated manifest.json if changed
+        run: |
+          if [ -n "$(git status --porcelain public/manifest.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/manifest.json
+            git commit -m "chore(media): sync public/manifest.json [skip ci]"
+            git push
+          else
+            echo "No media changes detected in public/manifest.json."
+          fi

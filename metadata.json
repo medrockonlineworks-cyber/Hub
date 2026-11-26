@@ -1,0 +1,6 @@
+{
+  "name": "EthioHub",
+  "description": "Ethiopian video streaming platform celebrating culture, music, cinema, and local content creators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
